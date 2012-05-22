@@ -1,0 +1,154 @@
+#!/usr/bin/env python
+
+import argparse, sqlite3, sys, getpass, string
+
+try:
+	con = sqlite3.connect('TermTicketer.db')
+	cur = con.cursor()
+except sqlite3, e: 
+	print "Error %s:" % e.args[0]
+#	sys.exit(1)
+
+#Get users name!
+username=getpass.getuser()
+
+parser = argparse.ArgumentParser(description='Terminal based ticketing system!')
+
+parser.add_argument('-n', '--new', action="store", dest='new', help='Creates a new based on the message you enter')
+parser.add_argument('-r', '--reply', action="store", dest='reply', help='Reply on an existing ticket')
+parser.add_argument('-v', '--view', action="store_true", default='False', help='View a specific ticket')
+parser.add_argument('-l', '--list', action="store", dest='list', type=int, help='List all tickets')
+parser.add_argument('-id', action="store", dest='id', type=int, help='Specify a Ticket ID')
+#parser.add_argument('-create-db', action="store_true", default=False, help='Creates sqlite database') ## No longer needed. DB will create automatically
+parser.add_argument('--complete', action="store_true", dest='complete', default='False', help='Sets status of ticket to complete')
+
+result = parser.parse_args()
+
+#Functions
+###########################
+class bcolors:
+    HEADER = '\033[44m'
+    #HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    DARK = '\033[2m'
+    ITALIC = '\033[3m'
+    RAPIDBLINK = '\033[6m'
+    STRIKETHROUGH = '\033[9m'
+    BOLD = '\033[1m'
+    def disable(self):
+        self.HEADER = ''
+        self.OKBLUE = ''
+        self.OKGREEN = ''
+        self.WARNING = ''
+        self.FAIL = ''
+        self.ENDC = ''
+	self.DARK = ''
+	self.ITALIC = ''
+	self.RAPIDBLINK = ''
+	self.STRIKETHROUGH = ''
+	self.BOLD = ''
+def new (message, username):
+ 	cur.execute("SELECT max(ticketid) FROM tickets")
+	result = cur.fetchall()
+	for x in result:
+		max = x[0] + 1
+	cur.execute("INSERT INTO tickets VALUES(null, ?, 0, ?, ?, CURRENT_TIMESTAMP)", (max, message, username))
+	print bcolors.OKGREEN + "New ticket has been created!"
+	con.commit()
+
+def reply (id, reply):
+	cur.execute("SELECT * FROM tickets WHERE ticketid=:id", {"id": id})
+	tickets = cur.fetchone()
+	if tickets != None:
+	        cur.execute("SELECT max(orderid) FROM tickets")
+	        result = cur.fetchall()
+	        for x in result:
+	                max = x[0] + 1
+		cur.execute("INSERT INTO tickets VALUES(null, ?, ?, ?, ?, CURRENT_TIMESTAMP)", (id, max, reply, username))
+		print bcolors.OKBLUE + "Reply \"" + reply + "\" has been added to ticket", id
+		con.commit()
+	else:
+		print bcolors.FAIL + "Ticket ID", id, "does not exist!"
+
+def view (id):
+        cur.execute("SELECT * FROM tickets WHERE ticketid=:id", {"id": id})
+        tickets = cur.fetchone()
+        if tickets != None:
+		cur.execute('SELECT * FROM tickets WHERE ticketid=:id', {"id": id})
+		allentries=cur.fetchall()
+		for x in allentries:
+			length = 15 - len(x[4])
+			dasheven = "-" * length
+			if x[2] != 0:
+				print bcolors.OKGREEN + "+-" + str(x[4]) + dasheven + "----->", str(x[3]), "@", str(x[5])
+			else: 
+				print bcolors.HEADER + bcolors.BOLD + "+------------------{TICKET", str(x[1]) + "}------------->" + bcolors.ENDC
+				print bcolors.OKBLUE + "+-" + str(x[4]) + dasheven + "->", str(x[3]), "@", str(x[5])
+				#print "ID: " + str(x[1]) + " Order ID: " + str(x[2]) + " Message: " + str(x[3]) + "  Username: " + str(x[4])
+        else:
+                print bcolors.WARNING + "Ticket ID", id, "does not exist!"
+
+def list (limit):
+	cur.execute("SELECT * FROM tickets WHERE orderid='0' ORDER BY ticketid DESC LIMIT :limit", {"limit": limit})
+	tickets = cur.fetchall()
+	results = len(tickets)
+	if results != 1:
+		for ticket in tickets:
+			if ticket[1] != 0:
+			        length = 15 - len(ticket[4])
+			        dasheven = "-" * length
+				if ticket[1] <= 9:
+					number = str(0) + str(ticket[1])
+				else:
+					number = ticket[1]
+				print bcolors.OKBLUE + " [" + str(number) + "]", str(ticket[4]) + dasheven + "->", str(ticket[3])
+	else:
+		print bcolors.FAIL + "No tickets exists!"
+		
+
+def complete (id):
+	print bcolors.OKBLUE +  "Ticket", id, "has been marked as complete!"
+
+def createdb():
+	print "Creating DB"
+	cur.execute("CREATE TABLE IF NOT EXISTS tickets(id INTEGER PRIMARY KEY AUTOINCREMENT, ticketid INTEGER, orderid INTEGER, Comment TEXT, User TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
+	cur.execute("INSERT INTO tickets VALUES(null, 0, 0, null, null, null)")
+	con.commit()
+
+#####################################
+
+
+if result.new != None:
+	new(result.new, username)
+elif result.reply != None:
+	if (result.id != None):
+		reply(result.id, result.reply)
+	else:
+		print bcolors.WARNING + "You must enter an ticket ID."
+elif result.list != None:
+	list(result.list)
+elif result.view == True:
+	view(result.id)
+elif result.complete == True:
+	if (result.id != None):
+		complete(result.id)
+	else:
+		print bcolors.WARNING + "You must enter an ticket ID"
+#elif result.create_db == True:
+#	createdb()
+else:
+	try:
+		list(10) #List recent tickets
+	except:
+		createdb()
+
+#Close connection.
+if con:
+        con.close()
+
+#Clean up the colors ;D
+print bcolors.ENDC
