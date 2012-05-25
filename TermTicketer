@@ -14,7 +14,7 @@ username=getpass.getuser()
 
 parser = argparse.ArgumentParser(description='Terminal based ticketing system!')
 
-parser.add_argument('-n', '--new', action="store", dest='new', help='Creates a new based on the message you enter')
+parser.add_argument('-n', '--new', action="store", dest='new', help='Creates a new ticket based on the message you enter')
 parser.add_argument('-r', '--reply', action="store", dest='reply', help='Reply on an existing ticket')
 parser.add_argument('-v', '--view', action="store_true", default='False', help='View a specific ticket')
 parser.add_argument('-l', '--list', action="store", dest='list', type=int, help='List all tickets')
